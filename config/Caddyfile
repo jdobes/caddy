@@ -1,0 +1,22 @@
+*.owny.cz {
+	tls acme@owny.cz {
+		#ca https://acme-v02.api.letsencrypt.org/directory
+		ca https://acme-staging-v02.api.letsencrypt.org/directory
+		dns acmeproxy https://*** {
+			username ***
+			password ***
+		}
+		resolvers ns.wedos.cz
+		propagation_timeout 30m
+	}
+
+	@whoami0 host whoami0.owny.cz
+	handle @whoami0 {
+		reverse_proxy whoami0:80
+	}
+
+	# Fallback for otherwise unhandled domains
+	handle {
+		abort
+	}
+}
