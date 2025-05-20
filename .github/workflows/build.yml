@@ -1,0 +1,37 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - "master"
+  schedule:
+    - cron: "0 5 * * 1" # Every Monday morning
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: build
+      cancel-in-progress: true
+    env:
+      REGISTRY: ghcr.io
+      REGISTRY_USER: ${{ github.actor }}
+      REGISTRY_PASS: ${{ secrets.GITHUB_TOKEN }}
+      REPO: jdobes/caddy
+      PLATFORM: linux/amd64,linux/arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install qemu-user-static for multi-arch build
+        run: |
+          sudo apt update && sudo apt install -y qemu-user-static
+      - name: Login to registry
+        run: |
+          echo "$REGISTRY_PASS" | podman login -u "$REGISTRY_USER" --password-stdin "$REGISTRY"
+      - name: Build and push latest version
+        run: |
+          CADDY_VERSION=$(curl https://api.github.com/repos/caddyserver/caddy/releases/latest | jq -r '.tag_name' | sed 's/v//')
+          podman build --platform "$PLATFORM" --manifest caddy --build-arg CADDY_VERSION=$CADDY_VERSION .
+          podman manifest push caddy docker://$REGISTRY/$REPO:$CADDY_VERSION
+          podman manifest push caddy docker://$REGISTRY/$REPO:latest
+          podman manifest rm caddy
