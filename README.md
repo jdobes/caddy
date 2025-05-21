@@ -1,5 +1,9 @@
 # caddy
 
+Automated caddy server container image build with acmeproxy plug-in.
+
+## Local test
+
     podman build -t localhost/caddy .
 
     podman network create caddy
@@ -9,5 +13,5 @@
     # Test reverse proxy
     curl -k --resolve whoami0.owny.cz:443:127.0.0.1 https://whoami0.owny.cz
 
-    # Graceful reload
+    # Graceful caddy reload without restarting container
     alias caddy-reload="podman exec -w /etc/caddy caddy caddy reload"
