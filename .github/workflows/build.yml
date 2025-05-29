@@ -30,8 +30,15 @@ jobs:
           echo "$REGISTRY_PASS" | podman login -u "$REGISTRY_USER" --password-stdin "$REGISTRY"
       - name: Build and push latest version
         run: |
-          CADDY_VERSION=$(curl https://api.github.com/repos/caddyserver/caddy/releases/latest | jq -r '.tag_name' | sed 's/v//')
-          podman build --platform "$PLATFORM" --manifest caddy --build-arg CADDY_VERSION=$CADDY_VERSION .
-          podman manifest push caddy docker://$REGISTRY/$REPO:$CADDY_VERSION
-          podman manifest push caddy docker://$REGISTRY/$REPO:latest
-          podman manifest rm caddy
+          LATEST_UPSTREAM_VERSION=$(curl -s https://api.github.com/repos/caddyserver/caddy/releases/latest | jq -r '.tag_name' | sed 's/v//')
+          LATEST_REBUILT_VERSION=$(curl -s -H "Authorization: Bearer $REGISTRY_PASS" https://api.github.com/users/jdobes/packages/container/caddy/versions | jq -r 'sort_by(.id) | reverse | .[0].metadata.container.tags.[] | select(. != "latest")')
+          echo "LATEST_UPSTREAM_VERSION: $LATEST_UPSTREAM_VERSION"
+          echo "LATEST_REBUILT_VERSION: $LATEST_REBUILT_VERSION"
+          if [ "$LATEST_UPSTREAM_VERSION" != "$LATEST_REBUILT_VERSION" ]; then
+              podman build --platform "$PLATFORM" --manifest caddy --build-arg CADDY_VERSION=$LATEST_UPSTREAM_VERSION .
+              podman manifest push caddy docker://$REGISTRY/$REPO:$LATEST_UPSTREAM_VERSION
+              podman manifest push caddy docker://$REGISTRY/$REPO:latest
+              podman manifest rm caddy
+          else
+              echo "Build skipped."
+          fi
