@@ -1,7 +1,7 @@
 FROM caddy:2.10.2-builder-alpine AS builder
 
 RUN xcaddy build \
-    --with github.com/caddy-dns/acmeproxy@v1.0.6
+    --with github.com/caddy-dns/acmeproxy@v1.1.1
 
 FROM caddy:2.10.2-alpine
 
