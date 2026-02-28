@@ -1,9 +1,8 @@
-ARG CADDY_VERSION=2.10.0
-FROM caddy:${CADDY_VERSION}-builder AS builder
+FROM caddy:2.10.2-builder-alpine AS builder
 
 RUN xcaddy build \
-    --with github.com/caddy-dns/acmeproxy
+    --with github.com/caddy-dns/acmeproxy@v1.0.6
 
-FROM caddy:${CADDY_VERSION}-alpine
+FROM caddy:2.10.2-alpine
 
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy

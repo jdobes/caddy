@@ -4,14 +4,15 @@ on:
   push:
     branches:
       - "master"
-  schedule:
-    - cron: "0 5 * * 1" # Every Monday morning
+  pull_request:
+    branches:
+      - "master"
 
 jobs:
   build:
     runs-on: ubuntu-latest
     concurrency:
-      group: build
+      group: build-${{ github.ref }}
       cancel-in-progress: true
     env:
       REGISTRY: ghcr.io
@@ -19,26 +20,30 @@ jobs:
       REGISTRY_PASS: ${{ secrets.GITHUB_TOKEN }}
       REPO: jdobes/caddy
       PLATFORM: linux/amd64,linux/arm64
+      PACKAGE_NAME: caddy
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install qemu-user-static for multi-arch build
         run: |
           sudo apt update && sudo apt install -y qemu-user-static
-      - name: Login to registry
+      - name: Build latest version
+        run: |
+          podman build --platform "$PLATFORM" --squash --manifest new_image .
+      - name: Login to registry and push built image
+        if: github.event_name == 'push'
         run: |
           echo "$REGISTRY_PASS" | podman login -u "$REGISTRY_USER" --password-stdin "$REGISTRY"
-      - name: Build and push latest version
+          TAG=$(grep "FROM caddy" Containerfile | head -n 1 | cut -d: -f2 | cut -d- -f1)
+          podman manifest push new_image docker://$REGISTRY/$REPO:$TAG
+          podman manifest push new_image docker://$REGISTRY/$REPO:latest
+      - name: Delete old images
+        if: github.event_name == 'push'
+        uses: dataaxiom/ghcr-cleanup-action@cd0cdb900b5dbf3a6f2cc869f0dbb0b8211f50c4 # v1
+        with:
+          packages: ${{ env.PACKAGE_NAME }}
+          keep-n-tagged: 5
+          delete-untagged: true
+      - name: Cleanup
         run: |
-          LATEST_UPSTREAM_VERSION=$(curl -s https://api.github.com/repos/caddyserver/caddy/releases/latest | jq -r '.tag_name' | sed 's/v//')
-          LATEST_REBUILT_VERSION=$(curl -s -H "Authorization: Bearer $REGISTRY_PASS" https://api.github.com/users/jdobes/packages/container/caddy/versions | jq -r 'sort_by(.id) | reverse | .[0].metadata.container.tags.[] | select(. != "latest")')
-          echo "LATEST_UPSTREAM_VERSION: $LATEST_UPSTREAM_VERSION"
-          echo "LATEST_REBUILT_VERSION: $LATEST_REBUILT_VERSION"
-          if [ "$LATEST_UPSTREAM_VERSION" != "$LATEST_REBUILT_VERSION" ]; then
-              podman build --platform "$PLATFORM" --manifest caddy --build-arg CADDY_VERSION=$LATEST_UPSTREAM_VERSION .
-              podman manifest push caddy docker://$REGISTRY/$REPO:$LATEST_UPSTREAM_VERSION
-              podman manifest push caddy docker://$REGISTRY/$REPO:latest
-              podman manifest rm caddy
-          else
-              echo "Build skipped."
-          fi
+          podman manifest rm new_image
