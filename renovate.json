@@ -6,7 +6,9 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["Containerfile"],
+      "managerFilePatterns": [
+        "/Containerfile/"
+      ],
       "matchStrings": ["--with (?<depName>[^@]+)@(?<currentValue>[^\\s\\\\]+)"],
       "datasourceTemplate": "go"
     }
